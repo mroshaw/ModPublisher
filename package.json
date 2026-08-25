@@ -1,0 +1,18 @@
+{
+  "name": "com.daftapplegames.modpublisher",
+  "version": "1.0.0",
+  "displayName": "Mod Publisher",
+  "description": "Unity editor tool to manage and publish mods on various mod hosting platforms.",
+  "unity": "2019.4",
+  "documentationUrl": "https://raw.githubusercontent.com/mroshaw/modpublisher/refs/heads/main/README.md",
+  "changelogUrl": "https://raw.githubusercontent.com/mroshaw/modpublisher/refs/heads/main/CHANGELOG.md",
+  "licensesUrl": "https://raw.githubusercontent.com/mroshaw/modpublisher/refs/heads/main/LICENSE.md",
+  "keywords": [
+    "mod publisher"
+  ],
+  "author": {
+    "name": "Daft Apple Games",
+    "email": "oli@mroshaw.co.uk",
+    "url": "https://github.com/mroshaw"
+  }
+}
