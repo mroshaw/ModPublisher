@@ -2,8 +2,6 @@ using System;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
-using ThunderKit.Core.Manifests;
 using UnityEditor;
 using UnityEngine;
 
@@ -18,7 +16,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             Patch
         }
 
-        private const string WindowTitle = "Mod Versions";
+        private const string WindowTitle = "Mod Publisher";
         private const string NexusApiKeyEditorPrefsKey = "DaftAppleModTools.NexusMods.ApiKey";
         private const string NexusArchiveFolder = "ThunderKit/NexusMods";
         private const double PersistenceDelaySeconds = 0.75d;
@@ -41,7 +39,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         private bool apiKeySavePending;
         private double persistenceDueTime;
 
-        [MenuItem("Tools/Mod Versions")]
+        [MenuItem("Tools/Mod Publisher")]
         public static void ShowWindow()
         {
             ModVersionEditorWindow window = GetWindow<ModVersionEditorWindow>();
@@ -282,7 +280,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             uploadStatus = "Starting upload...";
             CancellationTokenSource cancellation = new CancellationTokenSource();
             uploadCancellation = cancellation;
-            Progress<NexusUploadProgress> progress = new Progress<NexusUploadProgress>(UpdateUploadProgress);
+            Progress<UploadProgress> progress = new Progress<UploadProgress>(UpdateUploadProgress);
 
             try
             {
@@ -324,7 +322,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
         }
 
-        private void UpdateUploadProgress(NexusUploadProgress progress)
+        private void UpdateUploadProgress(UploadProgress progress)
         {
             uploadProgress = progress.Progress;
             uploadStatus = progress.Status;

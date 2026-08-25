@@ -7,7 +7,7 @@ namespace DaftAppleGames.Editor.ModPublisher
     public sealed class ModVersionSettings : ScriptableObject
     {
         private const string SettingsAssetPath =
-            "Assets/Mods/DaftAppleModTools_BZ/Scripts/Editor/Utils/ModVersionSettings.asset";
+            "Assets/ModVersionSettings.asset";
 
         private static ModVersionSettings instance;
 

@@ -1,6 +1,6 @@
 namespace DaftAppleGames.Editor.ModPublisher
 {
-    public struct NexusUploadProgress
+    public struct UploadProgress
     {
         public float Progress { get; }
         public string Status { get; }
@@ -8,7 +8,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         /// <summary>
         /// Creates an immutable Nexus upload progress update
         /// </summary>
-        public NexusUploadProgress(float progress, string status)
+        public UploadProgress(float progress, string status)
         {
             Progress = progress;
             Status = status;

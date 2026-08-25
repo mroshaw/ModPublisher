@@ -38,21 +38,21 @@ namespace DaftAppleGames.Editor.ModPublisher
             string zipFilePath,
             string version,
             string changelog,
-            IProgress<NexusUploadProgress> progress,
+            IProgress<UploadProgress> progress,
             CancellationToken cancellationToken)
         {
             FileInfo fileInfo = new FileInfo(zipFilePath);
             string globalModId = null;
             if (!string.IsNullOrWhiteSpace(changelog))
             {
-                progress.Report(new NexusUploadProgress(0.01f, "Resolving Nexus mod..."));
+                progress.Report(new UploadProgress(0.01f, "Resolving Nexus mod..."));
                 globalModId = await ResolveGlobalModIdAsync(
                     options.GameDomain,
                     options.GameScopedModId,
                     cancellationToken);
             }
 
-            progress.Report(new NexusUploadProgress(0.02f, "Creating multipart upload..."));
+            progress.Report(new UploadProgress(0.02f, "Creating multipart upload..."));
 
             JObject createUploadBody = new JObject
             {
@@ -77,10 +77,10 @@ namespace DaftAppleGames.Editor.ModPublisher
                 progress,
                 cancellationToken);
 
-            progress.Report(new NexusUploadProgress(0.72f, "Completing multipart upload..."));
+            progress.Report(new UploadProgress(0.72f, "Completing multipart upload..."));
             await CompleteMultipartUploadAsync(completeUrl, etags, cancellationToken);
 
-            progress.Report(new NexusUploadProgress(0.76f, "Finalising upload..."));
+            progress.Report(new UploadProgress(0.76f, "Finalising upload..."));
             await SendApiRequestAsync(
                 HttpMethod.Post,
                 $"/uploads/{Uri.EscapeDataString(uploadId)}/finalise",
@@ -89,7 +89,7 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             await WaitForUploadAsync(uploadId, progress, cancellationToken);
 
-            progress.Report(new NexusUploadProgress(0.92f, "Creating Nexus file version..."));
+            progress.Report(new UploadProgress(0.92f, "Creating Nexus file version..."));
             JObject createVersionBody = new JObject
             {
                 ["upload_id"] = uploadId,
@@ -114,7 +114,7 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             if (!string.IsNullOrWhiteSpace(changelog))
             {
-                progress.Report(new NexusUploadProgress(0.97f, "Adding changelog..."));
+                progress.Report(new UploadProgress(0.97f, "Adding changelog..."));
                 JObject changelogBody = new JObject
                 {
                     ["version"] = version,
@@ -127,7 +127,7 @@ namespace DaftAppleGames.Editor.ModPublisher
                     cancellationToken);
             }
 
-            progress.Report(new NexusUploadProgress(1.0f, "Upload complete."));
+            progress.Report(new UploadProgress(1.0f, "Upload complete."));
             return versionId;
         }
 
@@ -158,7 +158,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             string filePath,
             JArray partUrls,
             int partSize,
-            IProgress<NexusUploadProgress> progress,
+            IProgress<UploadProgress> progress,
             CancellationToken cancellationToken)
         {
             List<string> etags = new List<string>(partUrls.Count);
@@ -192,7 +192,7 @@ namespace DaftAppleGames.Editor.ModPublisher
                     }
 
                     float uploadProgress = 0.05f + (0.65f * (index + 1) / partUrls.Count);
-                    progress.Report(new NexusUploadProgress(
+                    progress.Report(new UploadProgress(
                         uploadProgress,
                         $"Uploaded part {index + 1} of {partUrls.Count}..."));
                 }
@@ -226,12 +226,12 @@ namespace DaftAppleGames.Editor.ModPublisher
 
         private async Task WaitForUploadAsync(
             string uploadId,
-            IProgress<NexusUploadProgress> progress,
+            IProgress<UploadProgress> progress,
             CancellationToken cancellationToken)
         {
             for (int attempt = 0; attempt < MaximumUploadPollAttempts; attempt++)
             {
-                progress.Report(new NexusUploadProgress(0.80f, "Waiting for Nexus to process the upload..."));
+                progress.Report(new UploadProgress(0.80f, "Waiting for Nexus to process the upload..."));
                 JObject response = await SendApiRequestAsync(
                     HttpMethod.Get,
                     $"/uploads/{Uri.EscapeDataString(uploadId)}",
