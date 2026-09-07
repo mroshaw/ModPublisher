@@ -103,6 +103,8 @@ namespace DaftAppleGames.Editor.ModPublisher
             SerializedProperty entryProperty = modsProperty.GetArrayElementAtIndex(index);
             SerializedProperty nameProperty = entryProperty.FindPropertyRelative("name");
             SerializedProperty versionProperty = entryProperty.FindPropertyRelative("version");
+            SerializedProperty currentPublishedVersionProperty =
+                entryProperty.FindPropertyRelative("currentPublishedVersion");
             string displayName = string.IsNullOrWhiteSpace(nameProperty.stringValue)
                 ? $"Mod {index + 1}"
                 : nameProperty.stringValue;
@@ -111,6 +113,9 @@ namespace DaftAppleGames.Editor.ModPublisher
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField($"{displayName}  v{version}", EditorStyles.boldLabel, GUILayout.MinWidth(180.0f));
+            EditorGUILayout.LabelField(
+                $"Current published: v{GetVersionString(currentPublishedVersionProperty)}",
+                GUILayout.Width(190.0f));
 
             if (GUILayout.Button("Major +", GUILayout.Width(90.0f)))
             {
@@ -263,6 +268,15 @@ namespace DaftAppleGames.Editor.ModPublisher
                 return;
             }
 
+            if (entry.Version.CompareTo(entry.CurrentPublishedVersion) <= 0)
+            {
+                EditorUtility.DisplayDialog(
+                    WindowTitle,
+                    $"Version {entry.Version} cannot be published because the current published version is {entry.CurrentPublishedVersion}.\n\nIncrement the mod version before publishing again.",
+                    "OK");
+                return;
+            }
+
             string version = entry.Version.ToString();
             string generatedZipPath = GetGeneratedZipPath(entry);
             bool confirmed = EditorUtility.DisplayDialog(
@@ -293,6 +307,9 @@ namespace DaftAppleGames.Editor.ModPublisher
                         nexusChangelog,
                         progress,
                         cancellation.Token);
+                    entry.CurrentPublishedVersion.Set(entry.Version);
+                    ModVersionSettings.Instance.SaveSettings();
+                    settingsObject.Update();
                     nexusChangelog = string.Empty;
                     EditorUtility.DisplayDialog(
                         WindowTitle,
