@@ -1,31 +1,13 @@
 using System;
 using UnityEngine;
-#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
-using Sirenix.OdinInspector;
-#endif
 
 namespace DaftAppleGames.Editor.ModPublisher
 {
     [Serializable]
     public class ModVersion : IComparable<ModVersion>
     {
-#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
-        [HorizontalGroup("Version")]
-        [LabelWidth(42)]
-        [MinValue(0)]
-#endif
         [SerializeField] private int major;
-#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
-        [HorizontalGroup("Version")]
-        [LabelWidth(42)]
-        [MinValue(0)]
-#endif
         [SerializeField] private int minor;
-#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
-        [HorizontalGroup("Version")]
-        [LabelWidth(42)]
-        [MinValue(0)]
-#endif
         [SerializeField] private int patch;
 
         public int Major => major;

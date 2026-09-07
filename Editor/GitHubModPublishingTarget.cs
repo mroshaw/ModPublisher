@@ -20,20 +20,26 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             if (string.IsNullOrWhiteSpace(context.GitHubOwner))
             {
-                error = "Enter the default GitHub repository owner.";
+                error = "Enter the GitHub repository owner in Publishing Connections.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(context.GitHubRepository))
+            {
+                error = "Enter the GitHub repository name in Publishing Connections.";
+                return false;
+            }
+
+            if (context.GitHubRepository.Contains("/"))
+            {
+                error = "Enter only the GitHub repository name; configure the owner separately in Publishing Connections.";
                 return false;
             }
 
             GitHubReleaseOptions options = context.Entry.GitHub;
-            if (options == null || string.IsNullOrWhiteSpace(options.RepositoryName))
+            if (options == null)
             {
-                error = "Enter the GitHub repository name for this mod.";
-                return false;
-            }
-
-            if (options.RepositoryName.Contains("/"))
-            {
-                error = "Enter only the GitHub repository name; the owner is configured in GitHub Connection.";
+                error = "GitHub release options are unavailable for this mod.";
                 return false;
             }
 
@@ -55,7 +61,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         }
 
         public string Describe(ModPublishingContext context) =>
-            $"GitHub {context.GitHubOwner}/{context.Entry.GitHub.RepositoryName}, tag {GetTagName(context)}";
+            $"GitHub {context.GitHubOwner}/{context.GitHubRepository}, tag {GetTagName(context)}";
 
         public async Task<ModPublishingResult> PublishAsync(
             ModPublishingContext context,
@@ -67,7 +73,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             {
                 GitHubReleaseResult result = await client.CreateReleaseWithAssetAsync(
                     context.GitHubOwner,
-                    options.RepositoryName,
+                    context.GitHubRepository,
                     GetTagName(context),
                     GetReleaseTitle(context),
                     context.Changelog,

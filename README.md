@@ -11,24 +11,23 @@ Install the package from its Git repository with Unity Package Manager:
 3. Enter `https://github.com/mroshaw/ModPublisher.git`.
 4. Open **Tools > Mod Publisher** after Unity finishes compiling.
 
-When Odin Inspector is installed and `ODIN_INSPECTOR` is defined, the mod configuration uses Odin grouping, toggle buttons, conditional site options, and inline validation. Define `DEBUG_NO_ODIN_INSPECTOR` to force the standard Unity fallback while testing. Publishing behavior and saved data are identical in both views.
-
 ## Configuration
 
 Connection details are configured once in **Publishing Connections**. They are saved in the current user's Unity Editor preferences and are not written to `Assets/ModVersionSettings.asset`.
 
-The connection section starts collapsed to keep credentials out of the way during normal publishing. Expand it when credentials or the default GitHub owner need to be changed.
+The connection section starts collapsed to keep credentials out of the way during normal publishing. Expand it when credentials or the GitHub repository details need to be changed.
 
 - **Nexus personal API key**: the personal key used by the Nexus Mods API.
-- **GitHub repository owner**: the user or organisation that owns the mod repositories.
-- **GitHub personal access token**: use a fine-grained token with **Contents: write** permission for each repository that will receive releases.
+- **GitHub repository owner**: the user or organisation that owns the mod repository.
+- **GitHub repository name**: the shared repository that receives every mod release.
+- **GitHub personal access token**: use a fine-grained token with **Contents: write** permission for the repository.
 
 Each mod entry has a **Publishing Sites** flags field. Check **Nexus**, **GitHub**, or both. Existing entries default to Nexus. Site-specific metadata remains on the mod:
 
 - Nexus stores the file group, game/mod identifiers, description, and upload behavior.
-- GitHub stores the repository name, tag/title templates, optional target branch or commit, draft/prerelease state, and generated-release-notes preference.
+- GitHub stores the tag/title templates, optional target branch or commit, draft/prerelease state, and generated-release-notes preference.
 
-The GitHub owner is intentionally connection-level. Enter only the repository name (without `owner/`) on each mod.
+The GitHub owner and repository are connection-level because all mods publish releases to the same repository.
 
 ## GitHub release naming
 

@@ -12,6 +12,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             string changelog,
             string nexusApiKey,
             string gitHubOwner,
+            string gitHubRepository,
             string gitHubToken)
         {
             Entry = entry;
@@ -19,6 +20,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             Changelog = changelog;
             NexusApiKey = nexusApiKey;
             GitHubOwner = gitHubOwner;
+            GitHubRepository = gitHubRepository;
             GitHubToken = gitHubToken;
         }
 
@@ -27,6 +29,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         public string Changelog { get; }
         public string NexusApiKey { get; }
         public string GitHubOwner { get; }
+        public string GitHubRepository { get; }
         public string GitHubToken { get; }
         public string Version => Entry.Version.ToString();
     }

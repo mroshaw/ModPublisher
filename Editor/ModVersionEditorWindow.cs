@@ -6,9 +6,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using UnityEditor;
 using UnityEngine;
-#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
-using Sirenix.OdinInspector.Editor;
-#endif
 
 namespace DaftAppleGames.Editor.ModPublisher
 {
@@ -24,6 +21,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         private const string WindowTitle = "Mod Publisher";
         private const string NexusApiKeyEditorPrefsKey = "DaftAppleModTools.NexusMods.ApiKey";
         private const string GitHubOwnerEditorPrefsKey = "DaftAppleModTools.GitHub.Owner";
+        private const string GitHubRepositoryEditorPrefsKey = "DaftAppleModTools.GitHub.Repository";
         private const string GitHubTokenEditorPrefsKey = "DaftAppleModTools.GitHub.Token";
         private const string StagingArchiveFolder = "ThunderKit/NexusMods";
         private const double PersistenceDelaySeconds = 0.75d;
@@ -38,6 +36,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         private Vector2 scrollPosition;
         private string nexusApiKey;
         private string gitHubOwner;
+        private string gitHubRepository;
         private string gitHubToken;
         private string publishChangelog = string.Empty;
         private int uploadingModIndex = -1;
@@ -48,9 +47,6 @@ namespace DaftAppleGames.Editor.ModPublisher
         private bool connectionSavePending;
         private bool showPublishingConnections;
         private double persistenceDueTime;
-#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
-        private PropertyTree settingsPropertyTree;
-#endif
         private readonly IModPublishingTarget[] publishingTargets =
         {
             new NexusModPublishingTarget(),
@@ -71,10 +67,8 @@ namespace DaftAppleGames.Editor.ModPublisher
             modsProperty = settingsObject.FindProperty("mods");
             nexusApiKey = EditorPrefs.GetString(NexusApiKeyEditorPrefsKey, string.Empty);
             gitHubOwner = EditorPrefs.GetString(GitHubOwnerEditorPrefsKey, string.Empty);
+            gitHubRepository = EditorPrefs.GetString(GitHubRepositoryEditorPrefsKey, string.Empty);
             gitHubToken = EditorPrefs.GetString(GitHubTokenEditorPrefsKey, string.Empty);
-#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
-            settingsPropertyTree = PropertyTree.Create(ModVersionSettings.Instance);
-#endif
             EditorApplication.update -= SavePendingChanges;
             EditorApplication.update += SavePendingChanges;
         }
@@ -83,14 +77,6 @@ namespace DaftAppleGames.Editor.ModPublisher
         {
             EditorApplication.update -= SavePendingChanges;
             SavePendingChanges(true);
-
-#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
-            if (settingsPropertyTree != null)
-            {
-                settingsPropertyTree.Dispose();
-                settingsPropertyTree = null;
-            }
-#endif
 
             if (uploadCancellation != null)
             {
@@ -111,7 +97,8 @@ namespace DaftAppleGames.Editor.ModPublisher
             DrawConnections();
 
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-            DrawModSettings();
+            EditorGUILayout.PropertyField(modsProperty, true);
+            ApplySettingsChanges();
             EditorGUILayout.Space();
             DrawPublishChangelog();
             EditorGUILayout.Space();
@@ -126,25 +113,6 @@ namespace DaftAppleGames.Editor.ModPublisher
             ApplySettingsChanges();
 
             EditorGUIUtility.labelWidth = previousLabelWidth;
-        }
-
-        private void DrawModSettings()
-        {
-#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
-            EditorGUI.BeginChangeCheck();
-            settingsPropertyTree.Draw();
-            if (EditorGUI.EndChangeCheck())
-            {
-                EditorUtility.SetDirty(ModVersionSettings.Instance);
-                SchedulePersistence(true, false);
-            }
-
-            // Keep the SerializedProperty view used by the action controls in sync with Odin.
-            settingsObject.Update();
-#else
-            EditorGUILayout.PropertyField(modsProperty, true);
-            ApplySettingsChanges();
-#endif
         }
 
         private void DrawVersionButtons(int index)
@@ -225,6 +193,13 @@ namespace DaftAppleGames.Editor.ModPublisher
             if (changedGitHubOwner != gitHubOwner)
             {
                 gitHubOwner = changedGitHubOwner;
+                SchedulePersistence(false, true);
+            }
+
+            string changedGitHubRepository = EditorGUILayout.TextField("GitHub repository name", gitHubRepository);
+            if (changedGitHubRepository != gitHubRepository)
+            {
+                gitHubRepository = changedGitHubRepository;
                 SchedulePersistence(false, true);
             }
 
@@ -328,6 +303,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             {
                 EditorPrefs.SetString(NexusApiKeyEditorPrefsKey, nexusApiKey);
                 EditorPrefs.SetString(GitHubOwnerEditorPrefsKey, gitHubOwner);
+                EditorPrefs.SetString(GitHubRepositoryEditorPrefsKey, gitHubRepository);
                 EditorPrefs.SetString(GitHubTokenEditorPrefsKey, gitHubToken);
                 connectionSavePending = false;
             }
@@ -344,6 +320,7 @@ namespace DaftAppleGames.Editor.ModPublisher
                 publishChangelog,
                 nexusApiKey,
                 gitHubOwner,
+                gitHubRepository,
                 gitHubToken);
             List<IModPublishingTarget> selectedTargets = GetSelectedTargets(entry);
             if (!TryValidatePublish(context, selectedTargets, out string error))
