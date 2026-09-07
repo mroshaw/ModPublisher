@@ -1,0 +1,12 @@
+{
+    "name": "DaftAppleGames.ModPublisher.Editor.Tests",
+    "references": [
+        "GUID:0a8949ccd8f29f74a94a85f1db7dd613"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

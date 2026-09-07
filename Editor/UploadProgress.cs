@@ -6,7 +6,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         public string Status { get; }
 
         /// <summary>
-        /// Creates an immutable Nexus upload progress update
+        /// Creates an immutable publishing progress update
         /// </summary>
         public UploadProgress(float progress, string status)
         {

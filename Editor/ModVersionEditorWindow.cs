@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using UnityEditor;
@@ -18,7 +20,9 @@ namespace DaftAppleGames.Editor.ModPublisher
 
         private const string WindowTitle = "Mod Publisher";
         private const string NexusApiKeyEditorPrefsKey = "DaftAppleModTools.NexusMods.ApiKey";
-        private const string NexusArchiveFolder = "ThunderKit/NexusMods";
+        private const string GitHubOwnerEditorPrefsKey = "DaftAppleModTools.GitHub.Owner";
+        private const string GitHubTokenEditorPrefsKey = "DaftAppleModTools.GitHub.Token";
+        private const string StagingArchiveFolder = "ThunderKit/NexusMods";
         private const double PersistenceDelaySeconds = 0.75d;
         private const float EditorLabelWidth = 230.0f;
         private const string VersionConstantPattern =
@@ -30,14 +34,21 @@ namespace DaftAppleGames.Editor.ModPublisher
         private SerializedProperty modsProperty;
         private Vector2 scrollPosition;
         private string nexusApiKey;
-        private string nexusChangelog = string.Empty;
+        private string gitHubOwner;
+        private string gitHubToken;
+        private string publishChangelog = string.Empty;
         private int uploadingModIndex = -1;
         private float uploadProgress;
         private string uploadStatus;
         private CancellationTokenSource uploadCancellation;
         private bool settingsSavePending;
-        private bool apiKeySavePending;
+        private bool connectionSavePending;
         private double persistenceDueTime;
+        private readonly IModPublishingTarget[] publishingTargets =
+        {
+            new NexusModPublishingTarget(),
+            new GitHubModPublishingTarget()
+        };
 
         [MenuItem("Tools/Mod Publisher")]
         public static void ShowWindow()
@@ -52,6 +63,8 @@ namespace DaftAppleGames.Editor.ModPublisher
             settingsObject = new SerializedObject(ModVersionSettings.Instance);
             modsProperty = settingsObject.FindProperty("mods");
             nexusApiKey = EditorPrefs.GetString(NexusApiKeyEditorPrefsKey, string.Empty);
+            gitHubOwner = EditorPrefs.GetString(GitHubOwnerEditorPrefsKey, string.Empty);
+            gitHubToken = EditorPrefs.GetString(GitHubTokenEditorPrefsKey, string.Empty);
             EditorApplication.update -= SavePendingChanges;
             EditorApplication.update += SavePendingChanges;
         }
@@ -74,16 +87,16 @@ namespace DaftAppleGames.Editor.ModPublisher
             settingsObject.Update();
 
             EditorGUILayout.HelpBox(
-                "Bumping updates the master version, plugin VersionString, and Manifest version. Nexus publishing uploads the generated ThunderKit ZIP as a new version of the configured Nexus file.",
+                "Bumping updates the master version, plugin VersionString, and Manifest version. Publishing sends the generated ThunderKit/NexusMods ZIP to every site checked on the mod.",
                 MessageType.Info);
 
-            DrawNexusApiKey();
+            DrawConnections();
 
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             EditorGUILayout.PropertyField(modsProperty, true);
             ApplySettingsChanges();
             EditorGUILayout.Space();
-            DrawNexusChangelog();
+            DrawPublishChangelog();
             EditorGUILayout.Space();
 
             for (int index = 0; index < modsProperty.arraySize; index++)
@@ -134,42 +147,56 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             EditorGUILayout.EndHorizontal();
 
-            DrawNexusButtons(index, displayName, version);
+            DrawPublishButtons(index, displayName, version);
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space();
         }
 
-        private void DrawNexusChangelog()
+        private void DrawPublishChangelog()
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.LabelField("Change Log for Next Publish", EditorStyles.boldLabel);
-            nexusChangelog = EditorGUILayout.TextArea(
-                nexusChangelog,
+            publishChangelog = EditorGUILayout.TextArea(
+                publishChangelog,
                 GUILayout.MinHeight(EditorGUIUtility.singleLineHeight * 3.0f));
             EditorGUILayout.HelpBox(
-                "This change log is used by the next successful publish, then cleared.",
+                "This change log is sent to each selected site and cleared when all selected publishes succeed.",
                 MessageType.None);
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawNexusApiKey()
+        private void DrawConnections()
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField("Nexus Mods", EditorStyles.boldLabel);
-            string changedApiKey = EditorGUILayout.PasswordField("Personal API key", nexusApiKey);
-            if (changedApiKey != nexusApiKey)
+            EditorGUILayout.LabelField("Publishing Connections", EditorStyles.boldLabel);
+            string changedNexusApiKey = EditorGUILayout.PasswordField("Nexus personal API key", nexusApiKey);
+            if (changedNexusApiKey != nexusApiKey)
             {
-                nexusApiKey = changedApiKey;
+                nexusApiKey = changedNexusApiKey;
+                SchedulePersistence(false, true);
+            }
+
+            string changedGitHubOwner = EditorGUILayout.TextField("GitHub repository owner", gitHubOwner);
+            if (changedGitHubOwner != gitHubOwner)
+            {
+                gitHubOwner = changedGitHubOwner;
+                SchedulePersistence(false, true);
+            }
+
+            string changedGitHubToken = EditorGUILayout.PasswordField("GitHub personal access token", gitHubToken);
+            if (changedGitHubToken != gitHubToken)
+            {
+                gitHubToken = changedGitHubToken;
                 SchedulePersistence(false, true);
             }
 
             EditorGUILayout.HelpBox(
-                "The API key is stored in this Windows user's Unity Editor preferences and is not written to the project asset.",
+                "Connection details are stored in this user's Unity Editor preferences and are not written to the project asset. The GitHub token needs Contents: write access to each target repository.",
                 MessageType.None);
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawNexusButtons(
+        private void DrawPublishButtons(
             int index,
             string displayName,
             string version)
@@ -181,19 +208,20 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             ModVersionEntry entry = ModVersionSettings.Instance.Mods[index];
             string generatedZipPath = GetGeneratedZipPath(entry);
+            string sites = GetSelectedSiteNames(entry);
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(18.0f);
             EditorGUILayout.LabelField(
                 File.Exists(generatedZipPath)
-                    ? $"Archive: {Path.GetFileName(generatedZipPath)}"
+                    ? $"Archive: {Path.GetFileName(generatedZipPath)}  →  {sites}"
                     : $"Archive not built: {Path.GetFileName(generatedZipPath)}",
                 GUILayout.MinWidth(300.0f));
 
             GUI.enabled = uploadingModIndex < 0;
             if (GUILayout.Button($"Publish {displayName} v{version}", GUILayout.Width(280.0f)))
             {
-                PublishToNexus(index);
+                Publish(index);
             }
 
             GUI.enabled = true;
@@ -221,10 +249,10 @@ namespace DaftAppleGames.Editor.ModPublisher
             SchedulePersistence(true, false);
         }
 
-        private void SchedulePersistence(bool saveSettings, bool saveApiKey)
+        private void SchedulePersistence(bool saveSettings, bool saveConnections)
         {
             settingsSavePending |= saveSettings;
-            apiKeySavePending |= saveApiKey;
+            connectionSavePending |= saveConnections;
             persistenceDueTime = EditorApplication.timeSinceStartup + PersistenceDelaySeconds;
         }
 
@@ -235,7 +263,7 @@ namespace DaftAppleGames.Editor.ModPublisher
 
         private void SavePendingChanges(bool force)
         {
-            if (!settingsSavePending && !apiKeySavePending)
+            if (!settingsSavePending && !connectionSavePending)
             {
                 return;
             }
@@ -251,18 +279,29 @@ namespace DaftAppleGames.Editor.ModPublisher
                 settingsSavePending = false;
             }
 
-            if (apiKeySavePending)
+            if (connectionSavePending)
             {
                 EditorPrefs.SetString(NexusApiKeyEditorPrefsKey, nexusApiKey);
-                apiKeySavePending = false;
+                EditorPrefs.SetString(GitHubOwnerEditorPrefsKey, gitHubOwner);
+                EditorPrefs.SetString(GitHubTokenEditorPrefsKey, gitHubToken);
+                connectionSavePending = false;
             }
         }
 
-        private async void PublishToNexus(int index)
+        private async void Publish(int index)
         {
             settingsObject.ApplyModifiedProperties();
             ModVersionEntry entry = ModVersionSettings.Instance.Mods[index];
-            if (!TryValidateNexusUpload(entry, out string error))
+            string archivePath = GetGeneratedZipPath(entry);
+            ModPublishingContext context = new ModPublishingContext(
+                entry,
+                archivePath,
+                publishChangelog,
+                nexusApiKey,
+                gitHubOwner,
+                gitHubToken);
+            List<IModPublishingTarget> selectedTargets = GetSelectedTargets(entry);
+            if (!TryValidatePublish(context, selectedTargets, out string error))
             {
                 EditorUtility.DisplayDialog(WindowTitle, error, "OK");
                 return;
@@ -278,10 +317,16 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
 
             string version = entry.Version.ToString();
-            string generatedZipPath = GetGeneratedZipPath(entry);
+            StringBuilder targetDescription = new StringBuilder();
+            foreach (IModPublishingTarget target in selectedTargets)
+            {
+                targetDescription.Append("\n• ");
+                targetDescription.Append(target.Describe(context));
+            }
+
             bool confirmed = EditorUtility.DisplayDialog(
-                "Publish to Nexus Mods",
-                $"Are you sure?\n\nUpload '{generatedZipPath}' as version {version} of Nexus file group {entry.NexusMods.FileGroupId}?\n\nThe change log will be cleared after a successful publish.",
+                "Publish Mod",
+                $"Upload '{archivePath}' as {entry.Name} v{version} to:{targetDescription}?\n\nThe change log will be cleared when every publish succeeds.",
                 "Yes, Publish",
                 "Cancel");
             if (!confirmed)
@@ -294,11 +339,12 @@ namespace DaftAppleGames.Editor.ModPublisher
             uploadStatus = "Starting upload...";
             CancellationTokenSource cancellation = new CancellationTokenSource();
             uploadCancellation = cancellation;
-            Progress<UploadProgress> progress = new Progress<UploadProgress>(UpdateUploadProgress);
+            List<string> successes = new List<string>();
+            List<string> failures = new List<string>();
 
             try
             {
-                using (NexusModsApiClient client = new NexusModsApiClient(nexusApiKey))
+                for (int targetIndex = 0; targetIndex < selectedTargets.Count; targetIndex++)
                 {
                     string versionId = await client.UploadNewVersionAsync(
                         entry.NexusMods,
@@ -315,16 +361,49 @@ namespace DaftAppleGames.Editor.ModPublisher
                         WindowTitle,
                         $"Published {entry.Name} {version} successfully. Nexus version ID: {versionId}",
                         "OK");
+                    IModPublishingTarget target = selectedTargets[targetIndex];
+                    int capturedTargetIndex = targetIndex;
+                    Progress<UploadProgress> progress = new Progress<UploadProgress>(value =>
+                        UpdateUploadProgress(value, target.DisplayName, capturedTargetIndex, selectedTargets.Count));
+                    try
+                    {
+                        ModPublishingResult result = await target.PublishAsync(
+                            context,
+                            progress,
+                            cancellation.Token);
+                        successes.Add($"{target.DisplayName}: {result.Message}");
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                        failures.Add($"{target.DisplayName}: {exception.Message}");
+                    }
                 }
+
+                if (failures.Count == 0)
+                {
+                    publishChangelog = string.Empty;
+                }
+
+                string heading = failures.Count == 0
+                    ? $"Published {entry.Name} {version} successfully."
+                    : $"Publishing {entry.Name} {version} completed with errors.";
+                string details = string.Join("\n", successes.ToArray());
+                if (failures.Count > 0)
+                {
+                    details += (details.Length == 0 ? string.Empty : "\n\n") +
+                               "Failed:\n" + string.Join("\n", failures.ToArray());
+                }
+
+                EditorUtility.DisplayDialog(WindowTitle, heading + "\n\n" + details, "OK");
             }
             catch (OperationCanceledException)
             {
-                Debug.LogWarning($"Nexus Mods upload for {entry.Name} was cancelled.");
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception);
-                EditorUtility.DisplayDialog(WindowTitle, $"Nexus upload failed:\n\n{exception.Message}", "OK");
+                Debug.LogWarning($"Publishing {entry.Name} was cancelled.");
             }
             finally
             {
@@ -339,57 +418,83 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
         }
 
-        private void UpdateUploadProgress(UploadProgress progress)
+        private void UpdateUploadProgress(
+            UploadProgress progress,
+            string targetName,
+            int targetIndex,
+            int targetCount)
         {
-            uploadProgress = progress.Progress;
-            uploadStatus = progress.Status;
+            uploadProgress = (targetIndex + progress.Progress) / targetCount;
+            uploadStatus = $"{targetName}: {progress.Status}";
             Repaint();
         }
 
-        private bool TryValidateNexusUpload(ModVersionEntry entry, out string error)
+        private static bool TryValidatePublish(
+            ModPublishingContext context,
+            IReadOnlyList<IModPublishingTarget> selectedTargets,
+            out string error)
         {
             error = null;
-            if (string.IsNullOrWhiteSpace(nexusApiKey))
+            if (selectedTargets.Count == 0)
             {
-                error = "Enter your Nexus Mods personal API key.";
+                error = "Check at least one Publishing Site for this mod.";
                 return false;
             }
 
-            if (entry.NexusMods == null || string.IsNullOrWhiteSpace(entry.NexusMods.FileGroupId))
+            if (context.Entry.Manifest == null || context.Entry.Manifest.Identity == null ||
+                string.IsNullOrWhiteSpace(context.Entry.Manifest.Identity.Name))
             {
-                error = "Enter the Nexus file Group ID shown in the file's API Info dialog.";
+                error = "Assign a valid ThunderKit Manifest so the generated archive can be located.";
                 return false;
             }
 
-            if (entry.Manifest == null || entry.Manifest.Identity == null ||
-                string.IsNullOrWhiteSpace(entry.Manifest.Identity.Name))
+            if (!File.Exists(context.ArchivePath))
             {
-                error = "Assign a valid ThunderKit Manifest so the generated Nexus archive can be located.";
+                error = $"The generated archive does not exist:\n{context.ArchivePath}\n\nRun the ThunderKit build/deploy pipeline first.";
                 return false;
             }
 
-            string generatedZipPath = GetGeneratedZipPath(entry);
-            if (!File.Exists(generatedZipPath))
+            foreach (IModPublishingTarget target in selectedTargets)
             {
-                error = $"The generated Nexus archive does not exist:\n{generatedZipPath}\n\nRun the ThunderKit build/deploy pipeline first.";
-                return false;
-            }
-
-            if (!string.IsNullOrWhiteSpace(nexusChangelog) &&
-                string.IsNullOrWhiteSpace(entry.NexusMods.GameScopedModId))
-            {
-                error = "Enter the Nexus game-scoped mod ID from the mod page URL when providing a changelog.";
-                return false;
-            }
-
-            if (!string.IsNullOrWhiteSpace(nexusChangelog) &&
-                string.IsNullOrWhiteSpace(entry.NexusMods.GameDomain))
-            {
-                error = "Enter the Nexus game domain when providing a changelog.";
-                return false;
+                if (!target.TryValidate(context, out string targetError))
+                {
+                    error = $"{target.DisplayName}: {targetError}";
+                    return false;
+                }
             }
 
             return true;
+        }
+
+        private List<IModPublishingTarget> GetSelectedTargets(ModVersionEntry entry)
+        {
+            List<IModPublishingTarget> selected = new List<IModPublishingTarget>();
+            foreach (IModPublishingTarget target in publishingTargets)
+            {
+                if (entry.PublishesTo(target.Site))
+                {
+                    selected.Add(target);
+                }
+            }
+
+            return selected;
+        }
+
+        private string GetSelectedSiteNames(ModVersionEntry entry)
+        {
+            List<IModPublishingTarget> selected = GetSelectedTargets(entry);
+            if (selected.Count == 0)
+            {
+                return "No sites selected";
+            }
+
+            string[] names = new string[selected.Count];
+            for (int index = 0; index < selected.Count; index++)
+            {
+                names[index] = selected[index].DisplayName;
+            }
+
+            return string.Join(", ", names);
         }
 
         private static string GetGeneratedZipPath(ModVersionEntry entry)
@@ -398,7 +503,7 @@ namespace DaftAppleGames.Editor.ModPublisher
                 ? entry.Name
                 : entry.Manifest.Identity.Name;
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            return Path.GetFullPath(Path.Combine(projectRoot, NexusArchiveFolder, manifestName + ".zip"));
+            return Path.GetFullPath(Path.Combine(projectRoot, StagingArchiveFolder, manifestName + ".zip"));
         }
 
         private void BumpVersion(int index, VersionComponent component)
