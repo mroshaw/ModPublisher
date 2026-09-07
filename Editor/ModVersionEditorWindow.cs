@@ -346,21 +346,6 @@ namespace DaftAppleGames.Editor.ModPublisher
             {
                 for (int targetIndex = 0; targetIndex < selectedTargets.Count; targetIndex++)
                 {
-                    string versionId = await client.UploadNewVersionAsync(
-                        entry.NexusMods,
-                        generatedZipPath,
-                        version,
-                        nexusChangelog,
-                        progress,
-                        cancellation.Token);
-                    entry.CurrentPublishedVersion.Set(entry.Version);
-                    ModVersionSettings.Instance.SaveSettings();
-                    settingsObject.Update();
-                    nexusChangelog = string.Empty;
-                    EditorUtility.DisplayDialog(
-                        WindowTitle,
-                        $"Published {entry.Name} {version} successfully. Nexus version ID: {versionId}",
-                        "OK");
                     IModPublishingTarget target = selectedTargets[targetIndex];
                     int capturedTargetIndex = targetIndex;
                     Progress<UploadProgress> progress = new Progress<UploadProgress>(value =>
@@ -386,6 +371,9 @@ namespace DaftAppleGames.Editor.ModPublisher
 
                 if (failures.Count == 0)
                 {
+                    entry.CurrentPublishedVersion.Set(entry.Version);
+                    ModVersionSettings.Instance.SaveSettings();
+                    settingsObject.Update();
                     publishChangelog = string.Empty;
                 }
 
