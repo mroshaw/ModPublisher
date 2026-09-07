@@ -11,9 +11,13 @@ Install the package from its Git repository with Unity Package Manager:
 3. Enter `https://github.com/mroshaw/ModPublisher.git`.
 4. Open **Tools > Mod Publisher** after Unity finishes compiling.
 
+When Odin Inspector is installed and `ODIN_INSPECTOR` is defined, the mod configuration uses Odin grouping, toggle buttons, conditional site options, and inline validation. Define `DEBUG_NO_ODIN_INSPECTOR` to force the standard Unity fallback while testing. Publishing behavior and saved data are identical in both views.
+
 ## Configuration
 
 Connection details are configured once in **Publishing Connections**. They are saved in the current user's Unity Editor preferences and are not written to `Assets/ModVersionSettings.asset`.
+
+The connection section starts collapsed to keep credentials out of the way during normal publishing. Expand it when credentials or the default GitHub owner need to be changed.
 
 - **Nexus personal API key**: the personal key used by the Nexus Mods API.
 - **GitHub repository owner**: the user or organisation that owns the mod repositories.

@@ -6,6 +6,9 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using UnityEditor;
 using UnityEngine;
+#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
+using Sirenix.OdinInspector.Editor;
+#endif
 
 namespace DaftAppleGames.Editor.ModPublisher
 {
@@ -43,7 +46,11 @@ namespace DaftAppleGames.Editor.ModPublisher
         private CancellationTokenSource uploadCancellation;
         private bool settingsSavePending;
         private bool connectionSavePending;
+        private bool showPublishingConnections;
         private double persistenceDueTime;
+#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
+        private PropertyTree settingsPropertyTree;
+#endif
         private readonly IModPublishingTarget[] publishingTargets =
         {
             new NexusModPublishingTarget(),
@@ -65,6 +72,9 @@ namespace DaftAppleGames.Editor.ModPublisher
             nexusApiKey = EditorPrefs.GetString(NexusApiKeyEditorPrefsKey, string.Empty);
             gitHubOwner = EditorPrefs.GetString(GitHubOwnerEditorPrefsKey, string.Empty);
             gitHubToken = EditorPrefs.GetString(GitHubTokenEditorPrefsKey, string.Empty);
+#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
+            settingsPropertyTree = PropertyTree.Create(ModVersionSettings.Instance);
+#endif
             EditorApplication.update -= SavePendingChanges;
             EditorApplication.update += SavePendingChanges;
         }
@@ -73,6 +83,14 @@ namespace DaftAppleGames.Editor.ModPublisher
         {
             EditorApplication.update -= SavePendingChanges;
             SavePendingChanges(true);
+
+#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
+            if (settingsPropertyTree != null)
+            {
+                settingsPropertyTree.Dispose();
+                settingsPropertyTree = null;
+            }
+#endif
 
             if (uploadCancellation != null)
             {
@@ -93,8 +111,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             DrawConnections();
 
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-            EditorGUILayout.PropertyField(modsProperty, true);
-            ApplySettingsChanges();
+            DrawModSettings();
             EditorGUILayout.Space();
             DrawPublishChangelog();
             EditorGUILayout.Space();
@@ -109,6 +126,25 @@ namespace DaftAppleGames.Editor.ModPublisher
             ApplySettingsChanges();
 
             EditorGUIUtility.labelWidth = previousLabelWidth;
+        }
+
+        private void DrawModSettings()
+        {
+#if ODIN_INSPECTOR && !DEBUG_NO_ODIN_INSPECTOR
+            EditorGUI.BeginChangeCheck();
+            settingsPropertyTree.Draw();
+            if (EditorGUI.EndChangeCheck())
+            {
+                EditorUtility.SetDirty(ModVersionSettings.Instance);
+                SchedulePersistence(true, false);
+            }
+
+            // Keep the SerializedProperty view used by the action controls in sync with Odin.
+            settingsObject.Update();
+#else
+            EditorGUILayout.PropertyField(modsProperty, true);
+            ApplySettingsChanges();
+#endif
         }
 
         private void DrawVersionButtons(int index)
@@ -168,7 +204,16 @@ namespace DaftAppleGames.Editor.ModPublisher
         private void DrawConnections()
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField("Publishing Connections", EditorStyles.boldLabel);
+            showPublishingConnections = EditorGUILayout.Foldout(
+                showPublishingConnections,
+                "Publishing Connections",
+                true);
+            if (!showPublishingConnections)
+            {
+                EditorGUILayout.EndVertical();
+                return;
+            }
+
             string changedNexusApiKey = EditorGUILayout.PasswordField("Nexus personal API key", nexusApiKey);
             if (changedNexusApiKey != nexusApiKey)
             {
