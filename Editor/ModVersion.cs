@@ -14,6 +14,17 @@ namespace DaftAppleGames.Editor.ModPublisher
         public int Minor => minor;
         public int Patch => patch;
 
+        public ModVersion()
+        {
+        }
+
+        public ModVersion(int major, int minor, int patch)
+        {
+            this.major = major;
+            this.minor = minor;
+            this.patch = patch;
+        }
+
         /// <summary>
         /// Copies the components from another version
         /// </summary>

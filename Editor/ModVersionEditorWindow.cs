@@ -97,7 +97,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             DrawConnections();
 
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-            EditorGUILayout.PropertyField(modsProperty, true);
+            DrawModsList();
             ApplySettingsChanges();
             EditorGUILayout.Space();
             DrawPublishChangelog();
@@ -113,6 +113,74 @@ namespace DaftAppleGames.Editor.ModPublisher
             ApplySettingsChanges();
 
             EditorGUIUtility.labelWidth = previousLabelWidth;
+        }
+
+        private void DrawModsList()
+        {
+            int previousSize = modsProperty.arraySize;
+            EditorGUILayout.PropertyField(modsProperty, true);
+            InitializeNewModEntries(previousSize);
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Add Mod", GUILayout.Width(120.0f)))
+            {
+                int newIndex = modsProperty.arraySize;
+                modsProperty.arraySize++;
+                InitializeModEntry(modsProperty.GetArrayElementAtIndex(newIndex));
+            }
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void InitializeNewModEntries(int previousSize)
+        {
+            for (int index = previousSize; index < modsProperty.arraySize; index++)
+            {
+                InitializeModEntry(modsProperty.GetArrayElementAtIndex(index));
+            }
+        }
+
+        private static void InitializeModEntry(SerializedProperty entryProperty)
+        {
+            entryProperty.FindPropertyRelative("name").stringValue = string.Empty;
+            entryProperty.FindPropertyRelative("pluginScript").objectReferenceValue = null;
+            entryProperty.FindPropertyRelative("manifest").objectReferenceValue = null;
+            SetVersion(entryProperty.FindPropertyRelative("version"), 1, 0, 0);
+            SetVersion(entryProperty.FindPropertyRelative("currentPublishedVersion"), 0, 0, 0);
+            entryProperty.FindPropertyRelative("publishingSites").intValue = (int)ModHostingSite.Nexus;
+
+            SerializedProperty nexusMods = entryProperty.FindPropertyRelative("nexusMods");
+            nexusMods.FindPropertyRelative("fileGroupId").stringValue = string.Empty;
+            nexusMods.FindPropertyRelative("gameScopedModId").stringValue = string.Empty;
+            nexusMods.FindPropertyRelative("gameDomain").stringValue = "subnauticabelowzero";
+            nexusMods.FindPropertyRelative("displayName").stringValue = string.Empty;
+            nexusMods.FindPropertyRelative("description").stringValue = string.Empty;
+            nexusMods.FindPropertyRelative("fileCategory").stringValue = "main";
+            nexusMods.FindPropertyRelative("archiveExistingVersion").boolValue = true;
+            nexusMods.FindPropertyRelative("updateModVersion").boolValue = true;
+            nexusMods.FindPropertyRelative("primaryModManagerDownload").boolValue = false;
+            nexusMods.FindPropertyRelative("allowModManagerDownload").boolValue = true;
+            nexusMods.FindPropertyRelative("showRequirementsPopup").boolValue = false;
+
+            SerializedProperty gitHub = entryProperty.FindPropertyRelative("gitHub");
+            gitHub.FindPropertyRelative("tagNameTemplate").stringValue = "{archiveName}-v{version}";
+            gitHub.FindPropertyRelative("releaseTitleTemplate").stringValue = "{displayName} v{version}";
+            gitHub.FindPropertyRelative("targetCommitish").stringValue = string.Empty;
+            gitHub.FindPropertyRelative("draft").boolValue = false;
+            gitHub.FindPropertyRelative("prerelease").boolValue = false;
+            gitHub.FindPropertyRelative("generateReleaseNotes").boolValue = false;
+        }
+
+        private static void SetVersion(
+            SerializedProperty versionProperty,
+            int major,
+            int minor,
+            int patch)
+        {
+            versionProperty.FindPropertyRelative("major").intValue = major;
+            versionProperty.FindPropertyRelative("minor").intValue = minor;
+            versionProperty.FindPropertyRelative("patch").intValue = patch;
         }
 
         private void DrawVersionButtons(int index)

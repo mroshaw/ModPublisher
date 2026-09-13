@@ -27,6 +27,8 @@ Each mod entry has a **Publishing Sites** flags field. Check **Nexus**, **GitHub
 - Nexus stores the file group, game/mod identifiers, description, and upload behavior.
 - GitHub stores the tag/title templates, optional target branch or commit, draft/prerelease state, and generated-release-notes preference.
 
+Use **Add Mod** below the mod list to create a clean entry for a first `1.0.0` release. Increasing the list size manually is also supported; new entries are reset to the same defaults instead of inheriting the previous mod's values.
+
 The GitHub owner and repository are connection-level because all mods publish releases to the same repository.
 
 ## GitHub release naming

@@ -11,7 +11,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         [SerializeField] private string name;
         [SerializeField] private MonoScript pluginScript;
         [SerializeField] private Manifest manifest;
-        [SerializeField] private ModVersion version = new ModVersion();
+        [SerializeField] private ModVersion version = new ModVersion(1, 0, 0);
         [SerializeField, HideInInspector] private ModVersion currentPublishedVersion = new ModVersion();
         [Tooltip("Select every hosting site that receives this mod when Publish is clicked.")]
         [SerializeField] private ModHostingSite publishingSites = ModHostingSite.Nexus;
