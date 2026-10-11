@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using Unity.Plastic.Newtonsoft.Json.Linq;
+using UnityEngine;
 
 namespace DaftAppleGames.Editor.ModPublisher.Tests
 {
@@ -72,10 +72,11 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
 
                 Assert.IsTrue(saved);
                 Assert.AreEqual("new-file", options.FileGroupId);
-                Assert.AreEqual("global-mod", handler.FileBody.Value<string>("mod_id"));
-                Assert.AreEqual("upload", handler.FileBody.Value<string>("upload_id"));
-                Assert.AreEqual("1.0.0", handler.FileBody.Value<string>("version"));
-                Assert.IsNull(handler.FileBody["archive_existing_file"]);
+                FileRequest body = JsonUtility.FromJson<FileRequest>(handler.FileBody);
+                Assert.AreEqual("global-mod", body.mod_id);
+                Assert.AreEqual("upload", body.upload_id);
+                Assert.AreEqual("1.0.0", body.version);
+                Assert.IsFalse(handler.FileBody.Contains("\"archive_existing_file\""));
                 Assert.AreEqual(1, handler.CreateRequests);
                 Assert.AreEqual(0, handler.VersionRequests);
             }
@@ -134,8 +135,8 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
                 Assert.AreEqual("existing-file", options.FileGroupId);
                 Assert.AreEqual(0, handler.CreateRequests);
                 Assert.AreEqual(1, handler.VersionRequests);
-                Assert.IsNull(handler.FileBody["mod_id"]);
-                Assert.IsTrue(handler.FileBody.Value<bool>("archive_existing_file"));
+                Assert.IsFalse(handler.FileBody.Contains("\"mod_id\""));
+                Assert.IsTrue(JsonUtility.FromJson<FileRequest>(handler.FileBody).archive_existing_file);
             }
             finally
             {
@@ -171,6 +172,15 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
             public void Report(UploadProgress value) { }
         }
 
+        [Serializable]
+        private sealed class FileRequest
+        {
+            public string mod_id;
+            public string upload_id;
+            public string version;
+            public bool archive_existing_file;
+        }
+
         private sealed class FakeNexusHandler : HttpMessageHandler
         {
             public bool FailChangelog;
@@ -178,7 +188,7 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
             public Action BeforeChangelog;
             public int CreateRequests;
             public int VersionRequests;
-            public JObject FileBody;
+            public string FileBody;
 
             protected override async Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request, CancellationToken cancellationToken)
@@ -203,7 +213,7 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
                 {
                     bool creating = path == "/v3/mod-files";
                     if (creating) CreateRequests++; else VersionRequests++;
-                    FileBody = JObject.Parse(await request.Content.ReadAsStringAsync());
+                    FileBody = await request.Content.ReadAsStringAsync();
                     if (FailFileRequest) return new HttpResponseMessage(HttpStatusCode.NotFound);
                     json = creating ? "{\"data\":{\"id\":\"new-file\"}}"
                         : "{\"data\":{\"version\":{\"id\":\"new-version\"}}}";
