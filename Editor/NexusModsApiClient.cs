@@ -84,13 +84,17 @@ namespace DaftAppleGames.Editor.ModPublisher
             await CompleteMultipartUploadAsync(completeUrl, etags, cancellationToken);
 
             progress.Report(new UploadProgress(0.76f, "Finalising upload..."));
-            await SendApiRequestAsync(
+            JObject finaliseResponse = await SendApiRequestAsync(
                 HttpMethod.Post,
                 $"/uploads/{Uri.EscapeDataString(uploadId)}/finalise",
                 null,
                 cancellationToken);
 
-            await WaitForUploadAsync(uploadId, progress, cancellationToken);
+            JObject finalisedUpload = RequireObject(finaliseResponse, "data");
+            if (RequireString(finalisedUpload, "state") != "available")
+            {
+                await WaitForUploadAsync(uploadId, progress, cancellationToken);
+            }
 
             progress.Report(new UploadProgress(0.92f,
                 creatingFile ? "Creating Nexus file..." : "Creating Nexus file version..."));
@@ -251,24 +255,42 @@ namespace DaftAppleGames.Editor.ModPublisher
             IProgress<UploadProgress> progress,
             CancellationToken cancellationToken)
         {
-            for (int attempt = 0; attempt < MaximumUploadPollAttempts; attempt++)
+            string lastState = "unknown";
+            using (CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
             {
-                progress.Report(new UploadProgress(0.80f, "Waiting for Nexus to process the upload..."));
-                JObject response = await SendApiRequestAsync(
-                    HttpMethod.Get,
-                    $"/uploads/{Uri.EscapeDataString(uploadId)}",
-                    null,
-                    cancellationToken);
-                JObject data = RequireObject(response, "data");
-                if (RequireString(data, "state") == "available")
+                timeout.CancelAfter(MaximumUploadPollAttempts * UploadPollDelayMilliseconds);
+                try
                 {
-                    return;
-                }
+                    for (int attempt = 0; attempt < MaximumUploadPollAttempts; attempt++)
+                    {
+                        progress.Report(new UploadProgress(0.80f,
+                            $"Checking Nexus upload readiness ({attempt + 1}/{MaximumUploadPollAttempts}, last state: {lastState})..."));
+                        JObject response = await SendApiRequestAsync(
+                            HttpMethod.Get,
+                            $"/uploads/{Uri.EscapeDataString(uploadId)}",
+                            null,
+                            timeout.Token);
+                        JObject data = RequireObject(response, "data");
+                        lastState = RequireString(data, "state");
+                        if (lastState == "available")
+                        {
+                            return;
+                        }
 
-                await Task.Delay(UploadPollDelayMilliseconds, cancellationToken);
+                        progress.Report(new UploadProgress(0.80f,
+                            $"Waiting for Nexus upload readiness (state: {lastState}, check {attempt + 1}/{MaximumUploadPollAttempts})..."));
+                        await Task.Delay(UploadPollDelayMilliseconds, timeout.Token);
+                    }
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    throw new TimeoutException(
+                        $"Nexus upload {uploadId} was not ready within two minutes. Last reported state: {lastState}.");
+                }
             }
 
-            throw new TimeoutException("Nexus Mods did not finish processing the upload in time.");
+            throw new TimeoutException(
+                $"Nexus upload {uploadId} did not become ready. Last reported state: {lastState}.");
         }
 
         private async Task<JObject> SendApiRequestAsync(
