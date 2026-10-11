@@ -123,6 +123,14 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
+            using (new EditorGUI.DisabledScope(uploadingModIndex >= 0 || modsProperty.arraySize < 2))
+            {
+                if (GUILayout.Button("Sort by Name", GUILayout.Width(120.0f)))
+                {
+                    SortModsByName();
+                }
+            }
+
             if (GUILayout.Button("Add Mod", GUILayout.Width(120.0f)))
             {
                 int newIndex = modsProperty.arraySize;
@@ -131,6 +139,28 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
 
             EditorGUILayout.EndHorizontal();
+        }
+
+        private void SortModsByName()
+        {
+            for (int index = 1; index < modsProperty.arraySize; index++)
+            {
+                string name = modsProperty.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("name").stringValue;
+                int destination = index;
+                while (destination > 0 && StringComparer.OrdinalIgnoreCase.Compare(
+                           modsProperty.GetArrayElementAtIndex(destination - 1)
+                               .FindPropertyRelative("name").stringValue,
+                           name) > 0)
+                {
+                    destination--;
+                }
+
+                if (destination != index)
+                {
+                    modsProperty.MoveArrayElement(index, destination);
+                }
+            }
         }
 
         private void InitializeNewModEntries(int previousSize)
