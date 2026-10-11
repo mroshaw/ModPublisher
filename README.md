@@ -54,6 +54,6 @@ For a display name of `Auto Locker Labels SV`, a manifest identity of `AutoLocke
 2. Enter the change log for the next publish.
 3. Click the mod's **Publish** button and confirm the listed targets.
 
-The same staged ZIP and change log are sent to every checked site. Targets run independently, so a failure on one does not prevent the remaining selected targets from being attempted. The change log is cleared only when every selected publish succeeds.
+The same staged ZIP and change log are sent to every checked site. Targets run independently, so a failure on one does not prevent the remaining selected targets from being attempted. The change log is retained after publishing until you edit or clear it manually.
 
 GitHub publishing creates a release and then uploads the ZIP as its release asset. The selected token must have access to the configured repository, and the requested tag must not already have a release.

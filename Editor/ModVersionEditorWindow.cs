@@ -38,7 +38,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         private string gitHubOwner;
         private string gitHubRepository;
         private string gitHubToken;
-        private string publishChangelog = string.Empty;
+        [SerializeField] private string publishChangelog = string.Empty;
         private int uploadingModIndex = -1;
         private float uploadProgress;
         private string uploadStatus;
@@ -268,7 +268,7 @@ namespace DaftAppleGames.Editor.ModPublisher
                 publishChangelog,
                 GUILayout.MinHeight(EditorGUIUtility.singleLineHeight * 3.0f));
             EditorGUILayout.HelpBox(
-                "This change log is sent to each selected site and cleared when all selected publishes succeed.",
+                "This change log is sent to each selected site and retained after publishing.",
                 MessageType.None);
             EditorGUILayout.EndVertical();
         }
@@ -456,7 +456,7 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             bool confirmed = EditorUtility.DisplayDialog(
                 "Publish Mod",
-                $"Upload '{archivePath}' as {entry.Name} v{version} to:{targetDescription}?\n\nThe change log will be cleared when every publish succeeds.",
+                $"Upload '{archivePath}' as {entry.Name} v{version} to:{targetDescription}?",
                 "Yes, Publish",
                 "Cancel");
             if (!confirmed)
@@ -504,7 +504,6 @@ namespace DaftAppleGames.Editor.ModPublisher
                     entry.CurrentPublishedVersion.Set(entry.Version);
                     ModVersionSettings.Instance.SaveSettings();
                     settingsObject.Update();
-                    publishChangelog = string.Empty;
                 }
 
                 string heading = failures.Count == 0
