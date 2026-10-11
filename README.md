@@ -13,7 +13,9 @@ Install the package from its Git repository with Unity Package Manager:
 
 ## Configuration
 
-Connection details are configured once in **Publishing Connections**. They are saved in the current user's Unity Editor preferences and are not written to `Assets/ModVersionSettings.asset`.
+Connection details are configured in **Publishing Connections**. The GitHub owner and repository are serialized in `Assets/ModVersionSettings.asset` alongside the project's mod settings, so they can be tracked in version control. API credentials are saved separately in the current user's Unity Editor preferences and are shared between projects; they are not written to the settings asset.
+
+When upgrading from the global repository setting, enter the GitHub owner and repository once in each project. The old global destination is deliberately not copied because it may belong to another project.
 
 The connection section starts collapsed to keep credentials out of the way during normal publishing. Expand it when credentials or the GitHub repository details need to be changed.
 
@@ -31,7 +33,7 @@ For the first Nexus upload, create the mod page on Nexus, enter its **Game Domai
 
 Use **Add Mod** below the mod list to create a clean entry for a first `1.0.0` release. Increasing the list size manually is also supported; new entries are reset to the same defaults instead of inheriting the previous mod's values.
 
-The GitHub owner and repository are connection-level because all mods publish releases to the same repository.
+The GitHub owner and repository apply to all mods in the current project. For example, configure `mroshaw/SubnauticaThunderKitMods` in the Subnautica project and `mroshaw/BelowZeroThunderKitMods` in the Below Zero project.
 
 ## GitHub release naming
 

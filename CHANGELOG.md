@@ -2,6 +2,11 @@
 
 ## Changelog
 
+### Unreleased
+
+- Moved the GitHub owner and repository into the project's ModVersionSettings asset to prevent publishing to another project's repository and allow version control. Configure the destination once per project after upgrading.
+- Included the repository and requested tag in GitHub publishing errors.
+
 ### Version 1.1.1
 
 - Changed Publishing Connections to a foldout that is collapsed by default.

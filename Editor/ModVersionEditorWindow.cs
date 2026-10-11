@@ -20,8 +20,6 @@ namespace DaftAppleGames.Editor.ModPublisher
 
         private const string WindowTitle = "Mod Publisher";
         private const string NexusApiKeyEditorPrefsKey = "DaftAppleModTools.NexusMods.ApiKey";
-        private const string GitHubOwnerEditorPrefsKey = "DaftAppleModTools.GitHub.Owner";
-        private const string GitHubRepositoryEditorPrefsKey = "DaftAppleModTools.GitHub.Repository";
         private const string GitHubTokenEditorPrefsKey = "DaftAppleModTools.GitHub.Token";
         private const string StagingArchiveFolder = "ThunderKit/NexusMods";
         private const double PersistenceDelaySeconds = 0.75d;
@@ -33,10 +31,10 @@ namespace DaftAppleGames.Editor.ModPublisher
 
         private SerializedObject settingsObject;
         private SerializedProperty modsProperty;
+        private SerializedProperty gitHubOwnerProperty;
+        private SerializedProperty gitHubRepositoryProperty;
         private Vector2 scrollPosition;
         private string nexusApiKey;
-        private string gitHubOwner;
-        private string gitHubRepository;
         private string gitHubToken;
         [SerializeField] private string publishChangelog = string.Empty;
         private int uploadingModIndex = -1;
@@ -65,9 +63,9 @@ namespace DaftAppleGames.Editor.ModPublisher
         {
             settingsObject = new SerializedObject(ModVersionSettings.Instance);
             modsProperty = settingsObject.FindProperty("mods");
+            gitHubOwnerProperty = settingsObject.FindProperty("gitHubOwner");
+            gitHubRepositoryProperty = settingsObject.FindProperty("gitHubRepository");
             nexusApiKey = EditorPrefs.GetString(NexusApiKeyEditorPrefsKey, string.Empty);
-            gitHubOwner = EditorPrefs.GetString(GitHubOwnerEditorPrefsKey, string.Empty);
-            gitHubRepository = EditorPrefs.GetString(GitHubRepositoryEditorPrefsKey, string.Empty);
             gitHubToken = EditorPrefs.GetString(GitHubTokenEditorPrefsKey, string.Empty);
             EditorApplication.update -= SavePendingChanges;
             EditorApplication.update += SavePendingChanges;
@@ -293,19 +291,8 @@ namespace DaftAppleGames.Editor.ModPublisher
                 SchedulePersistence(false, true);
             }
 
-            string changedGitHubOwner = EditorGUILayout.TextField("GitHub repository owner", gitHubOwner);
-            if (changedGitHubOwner != gitHubOwner)
-            {
-                gitHubOwner = changedGitHubOwner;
-                SchedulePersistence(false, true);
-            }
-
-            string changedGitHubRepository = EditorGUILayout.TextField("GitHub repository name", gitHubRepository);
-            if (changedGitHubRepository != gitHubRepository)
-            {
-                gitHubRepository = changedGitHubRepository;
-                SchedulePersistence(false, true);
-            }
+            EditorGUILayout.PropertyField(gitHubOwnerProperty, new GUIContent("GitHub repository owner"));
+            EditorGUILayout.PropertyField(gitHubRepositoryProperty, new GUIContent("GitHub repository name"));
 
             string changedGitHubToken = EditorGUILayout.PasswordField("GitHub personal access token", gitHubToken);
             if (changedGitHubToken != gitHubToken)
@@ -315,7 +302,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
 
             EditorGUILayout.HelpBox(
-                "Connection details are stored in this user's Unity Editor preferences and are not written to the project asset. The GitHub token needs Contents: write access to each target repository.",
+                "The GitHub owner and repository are saved in this project's ModVersionSettings asset. API credentials are shared between projects in this user's Unity Editor preferences. The GitHub token needs Contents: write access to each target repository.",
                 MessageType.None);
             EditorGUILayout.EndVertical();
         }
@@ -406,8 +393,6 @@ namespace DaftAppleGames.Editor.ModPublisher
             if (connectionSavePending)
             {
                 EditorPrefs.SetString(NexusApiKeyEditorPrefsKey, nexusApiKey);
-                EditorPrefs.SetString(GitHubOwnerEditorPrefsKey, gitHubOwner);
-                EditorPrefs.SetString(GitHubRepositoryEditorPrefsKey, gitHubRepository);
                 EditorPrefs.SetString(GitHubTokenEditorPrefsKey, gitHubToken);
                 connectionSavePending = false;
             }
@@ -423,8 +408,8 @@ namespace DaftAppleGames.Editor.ModPublisher
                 archivePath,
                 publishChangelog,
                 nexusApiKey,
-                gitHubOwner,
-                gitHubRepository,
+                ModVersionSettings.Instance.GitHubOwner,
+                ModVersionSettings.Instance.GitHubRepository,
                 gitHubToken);
             List<IModPublishingTarget> selectedTargets = GetSelectedTargets(entry);
             if (!TryValidatePublish(context, selectedTargets, out string error))

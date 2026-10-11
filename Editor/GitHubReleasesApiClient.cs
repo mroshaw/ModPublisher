@@ -28,9 +28,9 @@ namespace DaftAppleGames.Editor.ModPublisher
         private const string ApiVersion = "2026-03-10";
         private readonly HttpClient client;
 
-        public GitHubReleasesApiClient(string token)
+        public GitHubReleasesApiClient(string token, HttpMessageHandler handler = null)
         {
-            client = new HttpClient();
+            client = handler == null ? new HttpClient() : new HttpClient(handler);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             client.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
@@ -65,7 +65,10 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
 
             string endpoint = $"/repos/{Escape(owner)}/{Escape(repository)}/releases";
-            JObject release = await SendJsonAsync(HttpMethod.Post, ApiBaseUrl + endpoint, body, cancellationToken);
+            string releaseDescription = $"'{owner.Trim()}/{repository.Trim()}' with tag '{tagName}'";
+            JObject release = await SendJsonAsync(
+                HttpMethod.Post, ApiBaseUrl + endpoint, body,
+                $"create the GitHub release in {releaseDescription}", cancellationToken);
             string releaseId = RequireString(release, "id");
             string uploadUrl = RequireString(release, "upload_url");
             string htmlUrl = RequireString(release, "html_url");
@@ -87,7 +90,8 @@ namespace DaftAppleGames.Editor.ModPublisher
                 request.Content = content;
                 using (HttpResponseMessage response = await client.SendAsync(request, cancellationToken))
                 {
-                    await EnsureSuccessAsync(response, "upload the GitHub release asset");
+                    await EnsureSuccessAsync(response,
+                        $"upload GitHub release asset '{assetName}' to {releaseDescription}");
                 }
             }
 
@@ -104,6 +108,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             HttpMethod method,
             string url,
             JObject body,
+            string operation,
             CancellationToken cancellationToken)
         {
             using (HttpRequestMessage request = new HttpRequestMessage(method, url))
@@ -111,7 +116,7 @@ namespace DaftAppleGames.Editor.ModPublisher
                 request.Content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
                 using (HttpResponseMessage response = await client.SendAsync(request, cancellationToken))
                 {
-                    await EnsureSuccessAsync(response, "create the GitHub release");
+                    await EnsureSuccessAsync(response, operation);
                     string json = await response.Content.ReadAsStringAsync();
                     return JObject.Parse(json);
                 }

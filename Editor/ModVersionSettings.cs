@@ -12,9 +12,13 @@ namespace DaftAppleGames.Editor.ModPublisher
         private static ModVersionSettings instance;
 
         [SerializeField] private List<ModVersionEntry> mods = new List<ModVersionEntry>();
+        [SerializeField] private string gitHubOwner;
+        [SerializeField] private string gitHubRepository;
 
         public static ModVersionSettings Instance => instance == null ? LoadOrCreate() : instance;
         public IReadOnlyList<ModVersionEntry> Mods => mods;
+        public string GitHubOwner => gitHubOwner;
+        public string GitHubRepository => gitHubRepository;
 
         /// <summary>
         /// Saves the project-specific mod version configuration
