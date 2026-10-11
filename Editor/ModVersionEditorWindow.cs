@@ -224,12 +224,18 @@ namespace DaftAppleGames.Editor.ModPublisher
                 ? $"Mod {index + 1}"
                 : nameProperty.stringValue;
             string version = GetVersionString(versionProperty);
+            string currentPublishedVersion = GetVersionString(currentPublishedVersionProperty);
 
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            Rect entryRect = EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            if (version != currentPublishedVersion && Event.current.type == EventType.Repaint)
+            {
+                EditorGUI.DrawRect(entryRect, new Color(1.0f, 0.15f, 0.15f, 0.25f));
+            }
+
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField($"{displayName}  v{version}", EditorStyles.boldLabel, GUILayout.MinWidth(180.0f));
             EditorGUILayout.LabelField(
-                $"Current published: v{GetVersionString(currentPublishedVersionProperty)}",
+                $"Current published: v{currentPublishedVersion}",
                 GUILayout.Width(190.0f));
 
             if (GUILayout.Button("Major +", GUILayout.Width(90.0f)))
