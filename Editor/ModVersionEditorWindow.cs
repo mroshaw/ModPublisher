@@ -429,11 +429,15 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             if (entry.Version.CompareTo(entry.CurrentPublishedVersion) <= 0)
             {
-                EditorUtility.DisplayDialog(
+                bool continuePublishing = EditorUtility.DisplayDialog(
                     WindowTitle,
-                    $"Version {entry.Version} cannot be published because the current published version is {entry.CurrentPublishedVersion}.\n\nIncrement the mod version before publishing again.",
-                    "OK");
-                return;
+                    $"Version {entry.Version} is lower than or equal to the current published version {entry.CurrentPublishedVersion}.\n\nDo you want to continue?",
+                    "Yes",
+                    "No");
+                if (!continuePublishing)
+                {
+                    return;
+                }
             }
 
             string version = entry.Version.ToString();
