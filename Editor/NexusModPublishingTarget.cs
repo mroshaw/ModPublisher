@@ -19,23 +19,25 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
 
             NexusModsUploadOptions options = context.Entry.NexusMods;
-            if (options == null || string.IsNullOrWhiteSpace(options.FileGroupId))
+            if (options == null)
             {
-                error = "Enter the Nexus file Group ID shown in the file's API Info dialog.";
+                error = "Configure the Nexus Mods upload options.";
                 return false;
             }
 
-            if (!string.IsNullOrWhiteSpace(context.Changelog) &&
+            bool needsModId = string.IsNullOrWhiteSpace(options.FileGroupId) ||
+                              !string.IsNullOrWhiteSpace(context.Changelog);
+            if (needsModId &&
                 string.IsNullOrWhiteSpace(options.GameScopedModId))
             {
-                error = "Enter the Nexus game-scoped mod ID from the mod page URL when providing a changelog.";
+                error = "Enter the Nexus game-scoped mod ID from the mod page URL when creating a file or providing a changelog.";
                 return false;
             }
 
-            if (!string.IsNullOrWhiteSpace(context.Changelog) &&
+            if (needsModId &&
                 string.IsNullOrWhiteSpace(options.GameDomain))
             {
-                error = "Enter the Nexus game domain when providing a changelog.";
+                error = "Enter the Nexus game domain when creating a file or providing a changelog.";
                 return false;
             }
 
@@ -43,7 +45,9 @@ namespace DaftAppleGames.Editor.ModPublisher
         }
 
         public string Describe(ModPublishingContext context) =>
-            $"Nexus Mods file group {context.Entry.NexusMods.FileGroupId}";
+            string.IsNullOrWhiteSpace(context.Entry.NexusMods.FileGroupId)
+                ? $"New Nexus Mods file on {context.Entry.NexusMods.GameDomain}/mods/{context.Entry.NexusMods.GameScopedModId}"
+                : $"Nexus Mods file group {context.Entry.NexusMods.FileGroupId}";
 
         public async Task<ModPublishingResult> PublishAsync(
             ModPublishingContext context,
@@ -52,14 +56,18 @@ namespace DaftAppleGames.Editor.ModPublisher
         {
             using (NexusModsApiClient client = new NexusModsApiClient(context.NexusApiKey))
             {
-                string versionId = await client.UploadNewVersionAsync(
+                bool creatingFile = string.IsNullOrWhiteSpace(context.Entry.NexusMods.FileGroupId);
+                string identifier = await client.UploadNewVersionAsync(
                     context.Entry.NexusMods,
                     context.ArchivePath,
                     context.Version,
                     context.Changelog,
                     progress,
-                    cancellationToken);
-                return new ModPublishingResult(versionId, $"Nexus version ID: {versionId}");
+                    cancellationToken,
+                    () => ModVersionSettings.Instance.SaveSettings());
+                return new ModPublishingResult(identifier, creatingFile
+                    ? $"Nexus file Group ID: {identifier} (saved to mod configuration)"
+                    : $"Nexus version ID: {identifier}");
             }
         }
     }

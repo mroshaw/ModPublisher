@@ -31,7 +31,8 @@ namespace DaftAppleGames.Editor.ModPublisher
         }
 
         /// <summary>
-        /// Uploads an archive and creates a new version of an existing Nexus Mods file
+        /// Uploads an archive and creates a file when no Group ID is configured, or a new version otherwise.
+        /// Returns the new file ID or version ID respectively. Invokes onFileCreated before adding the changelog.
         /// </summary>
         public async Task<string> UploadNewVersionAsync(
             NexusModsUploadOptions options,
@@ -39,11 +40,13 @@ namespace DaftAppleGames.Editor.ModPublisher
             string version,
             string changelog,
             IProgress<UploadProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Action onFileCreated = null)
         {
             FileInfo fileInfo = new FileInfo(zipFilePath);
+            bool creatingFile = string.IsNullOrWhiteSpace(options.FileGroupId);
             string globalModId = null;
-            if (!string.IsNullOrWhiteSpace(changelog))
+            if (creatingFile || !string.IsNullOrWhiteSpace(changelog))
             {
                 progress.Report(new UploadProgress(0.01f, "Resolving Nexus mod..."));
                 globalModId = await ResolveGlobalModIdAsync(
@@ -89,7 +92,8 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             await WaitForUploadAsync(uploadId, progress, cancellationToken);
 
-            progress.Report(new UploadProgress(0.92f, "Creating Nexus file version..."));
+            progress.Report(new UploadProgress(0.92f,
+                creatingFile ? "Creating Nexus file..." : "Creating Nexus file version..."));
             JObject createVersionBody = new JObject
             {
                 ["upload_id"] = uploadId,
@@ -97,20 +101,38 @@ namespace DaftAppleGames.Editor.ModPublisher
                 ["description"] = NullIfEmpty(options.Description),
                 ["version"] = version,
                 ["file_category"] = string.IsNullOrWhiteSpace(options.FileCategory) ? "main" : options.FileCategory,
-                ["archive_existing_file"] = options.ArchiveExistingVersion,
                 ["primary_mod_manager_download"] = options.PrimaryModManagerDownload,
                 ["allow_mod_manager_download"] = options.AllowModManagerDownload,
                 ["show_requirements_pop_up"] = options.ShowRequirementsPopup,
                 ["update_mod_version"] = options.UpdateModVersion
             };
+            if (creatingFile)
+            {
+                createVersionBody["mod_id"] = globalModId;
+            }
+            else
+            {
+                createVersionBody["archive_existing_file"] = options.ArchiveExistingVersion;
+            }
+
             JObject versionResponse = await SendApiRequestAsync(
                 HttpMethod.Post,
-                $"/mod-files/{Uri.EscapeDataString(options.FileGroupId)}/versions",
+                creatingFile ? "/mod-files" : $"/mod-files/{Uri.EscapeDataString(options.FileGroupId)}/versions",
                 createVersionBody,
                 cancellationToken);
             JObject versionData = RequireObject(versionResponse, "data");
-            JObject versionObject = RequireObject(versionData, "version");
-            string versionId = RequireString(versionObject, "id");
+            string identifier;
+            if (creatingFile)
+            {
+                identifier = RequireString(versionData, "id");
+                options.FileGroupId = identifier;
+                onFileCreated?.Invoke();
+            }
+            else
+            {
+                JObject versionObject = RequireObject(versionData, "version");
+                identifier = RequireString(versionObject, "id");
+            }
 
             if (!string.IsNullOrWhiteSpace(changelog))
             {
@@ -128,7 +150,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
 
             progress.Report(new UploadProgress(1.0f, "Upload complete."));
-            return versionId;
+            return identifier;
         }
 
         private async Task<string> ResolveGlobalModIdAsync(

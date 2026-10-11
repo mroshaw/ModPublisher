@@ -8,6 +8,7 @@ namespace DaftAppleGames.Editor.ModPublisher
     public sealed class NexusModsUploadOptions
     {
         [FormerlySerializedAs("fileId")]
+        [Tooltip("Leave blank to create the first file on an existing Nexus mod page. The returned ID is saved automatically.")]
         [SerializeField] private string fileGroupId;
         [FormerlySerializedAs("modId")]
         [SerializeField] private string gameScopedModId;
@@ -22,7 +23,11 @@ namespace DaftAppleGames.Editor.ModPublisher
         [SerializeField] private bool allowModManagerDownload = true;
         [SerializeField] private bool showRequirementsPopup;
 
-        public string FileGroupId => fileGroupId;
+        public string FileGroupId
+        {
+            get => fileGroupId;
+            internal set => fileGroupId = value;
+        }
         public string GameScopedModId => gameScopedModId;
         public string GameDomain => gameDomain;
         public string DisplayName => displayName;
