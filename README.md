@@ -56,6 +56,8 @@ For a display name of `Auto Locker Labels SV`, a manifest identity of `AutoLocke
 2. Enter the change log for the next publish.
 3. Click the mod's **Publish** button and confirm the listed targets.
 
+Each publishing row can be collapsed or expanded by clicking its mod name. Collapsed rows keep the mod name, version, and current published version visible, while hiding the version and publishing controls. Rows start collapsed, and their collapsed state follows the mod when the list is sorted.
+
 The same staged ZIP and change log are sent to every checked site. Targets run independently, so a failure on one does not prevent the remaining selected targets from being attempted. The change log is retained after publishing until you edit or clear it manually.
 
 GitHub publishing creates a release and then uploads the ZIP as its release asset. The selected token must have access to the configured repository, and the requested tag must not already have a release.

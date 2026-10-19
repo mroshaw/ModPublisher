@@ -45,6 +45,7 @@ namespace DaftAppleGames.Editor.ModPublisher
         private bool connectionSavePending;
         private bool showPublishingConnections;
         private double persistenceDueTime;
+        private readonly HashSet<ModVersionEntry> expandedPublishRows = new HashSet<ModVersionEntry>();
         private readonly IModPublishingTarget[] publishingTargets =
         {
             new NexusModPublishingTarget(),
@@ -213,6 +214,7 @@ namespace DaftAppleGames.Editor.ModPublisher
 
         private void DrawVersionButtons(int index)
         {
+            ModVersionEntry entry = ModVersionSettings.Instance.Mods[index];
             SerializedProperty entryProperty = modsProperty.GetArrayElementAtIndex(index);
             SerializedProperty nameProperty = entryProperty.FindPropertyRelative("name");
             SerializedProperty versionProperty = entryProperty.FindPropertyRelative("version");
@@ -231,10 +233,31 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
 
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"{displayName}  v{version}", EditorStyles.boldLabel, GUILayout.MinWidth(180.0f));
+            bool expanded = EditorGUILayout.Foldout(
+                expandedPublishRows.Contains(entry),
+                $"{displayName}  v{version}",
+                true,
+                EditorStyles.foldout);
+            if (expanded)
+            {
+                expandedPublishRows.Add(entry);
+            }
+            else
+            {
+                expandedPublishRows.Remove(entry);
+            }
+
             EditorGUILayout.LabelField(
                 $"Current published: v{currentPublishedVersion}",
                 GUILayout.Width(190.0f));
+
+            if (!expanded)
+            {
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndVertical();
+                EditorGUILayout.Space();
+                return;
+            }
 
             if (GUILayout.Button("Major +", GUILayout.Width(90.0f)))
             {
