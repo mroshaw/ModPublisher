@@ -60,4 +60,4 @@ Each publishing row can be collapsed or expanded by clicking its mod name. Colla
 
 The same staged ZIP and change log are sent to every checked site. Targets run independently, so a failure on one does not prevent the remaining selected targets from being attempted. The change log is retained after publishing until you edit or clear it manually.
 
-GitHub publishing creates a release and then uploads the ZIP as its release asset. The selected token must have access to the configured repository, and the requested tag must not already have a release.
+GitHub publishing checks for a release with the requested tag and reuses it when found, preserving its release details. Otherwise, it creates a release, using the existing tag if one is already present. It then uploads the ZIP as a release asset. The selected token must have access to the configured repository. Uploading an asset with a name already attached to the release is still reported as an error.

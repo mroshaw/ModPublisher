@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -49,7 +50,7 @@ namespace DaftAppleGames.Editor.ModPublisher
             IProgress<UploadProgress> progress,
             CancellationToken cancellationToken)
         {
-            progress.Report(new UploadProgress(0.05f, "Creating GitHub release..."));
+            progress.Report(new UploadProgress(0.05f, "Checking for existing GitHub release..."));
             JObject body = new JObject
             {
                 ["tag_name"] = tagName,
@@ -66,9 +67,16 @@ namespace DaftAppleGames.Editor.ModPublisher
 
             string endpoint = $"/repos/{Escape(owner)}/{Escape(repository)}/releases";
             string releaseDescription = $"'{owner.Trim()}/{repository.Trim()}' with tag '{tagName}'";
-            JObject release = await SendJsonAsync(
-                HttpMethod.Post, ApiBaseUrl + endpoint, body,
-                $"create the GitHub release in {releaseDescription}", cancellationToken);
+            JObject release = await GetReleaseByTagAsync(
+                ApiBaseUrl + endpoint + "/tags/" + Uri.EscapeDataString(tagName),
+                releaseDescription, cancellationToken);
+            if (release == null)
+            {
+                progress.Report(new UploadProgress(0.1f, "Creating GitHub release..."));
+                release = await SendJsonAsync(
+                    HttpMethod.Post, ApiBaseUrl + endpoint, body,
+                    $"create the GitHub release in {releaseDescription}", cancellationToken);
+            }
             string releaseId = RequireString(release, "id");
             string uploadUrl = RequireString(release, "upload_url");
             string htmlUrl = RequireString(release, "html_url");
@@ -102,6 +110,23 @@ namespace DaftAppleGames.Editor.ModPublisher
         public void Dispose()
         {
             client.Dispose();
+        }
+
+        private async Task<JObject> GetReleaseByTagAsync(
+            string url,
+            string releaseDescription,
+            CancellationToken cancellationToken)
+        {
+            using (HttpResponseMessage response = await client.GetAsync(url, cancellationToken))
+            {
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+
+                await EnsureSuccessAsync(response, $"find the GitHub release in {releaseDescription}");
+                return JObject.Parse(await response.Content.ReadAsStringAsync());
+            }
         }
 
         private async Task<JObject> SendJsonAsync(

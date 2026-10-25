@@ -23,13 +23,63 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
         public void TearDown() => File.Delete(archivePath);
 
         [Test]
-        public async Task DuplicateTagErrorIdentifiesDestinationAndDoesNotUpload()
+        public async Task ExistingReleaseUploadsArchiveWithoutCreatingRelease()
+        {
+            int requests = 0;
+            using (GitHubReleasesApiClient client = new GitHubReleasesApiClient("test-token",
+                       new TestHandler(request =>
+                       {
+                           if (++requests == 1)
+                           {
+                               AssertReleaseLookup(request);
+                               return ReleaseResponse();
+                           }
+
+                           Assert.AreEqual(HttpMethod.Post, request.Method);
+                           StringAssert.StartsWith("https://uploads.github.com/", request.RequestUri.AbsoluteUri);
+                           return Response(HttpStatusCode.Created, "{}");
+                       })))
+            {
+                GitHubReleaseResult result = await Publish(client);
+                Assert.AreEqual("123", result.ReleaseId);
+                StringAssert.EndsWith("/VehicleEnhancements_SN-v1.0.0", result.HtmlUrl);
+                Assert.AreEqual(2, requests);
+            }
+        }
+
+        [Test]
+        public async Task ReleaseLookupErrorIdentifiesDestinationAndDoesNotCreateOrUpload()
         {
             int requests = 0;
             using (GitHubReleasesApiClient client = new GitHubReleasesApiClient("test-token",
                        new TestHandler(request =>
                        {
                            requests++;
+                           AssertReleaseLookup(request);
+                           return Response(HttpStatusCode.Forbidden, "Access denied");
+                       })))
+            {
+                HttpRequestException exception = await PublishExpectingFailure(client);
+                StringAssert.Contains("mroshaw/BelowZeroThunderKitMods", exception.Message);
+                StringAssert.Contains("VehicleEnhancements_SN-v1.0.0", exception.Message);
+                StringAssert.Contains("Access denied", exception.Message);
+                Assert.AreEqual(1, requests);
+            }
+        }
+
+        [Test]
+        public async Task ReleaseCreationErrorIdentifiesDestinationAndDoesNotUpload()
+        {
+            int requests = 0;
+            using (GitHubReleasesApiClient client = new GitHubReleasesApiClient("test-token",
+                       new TestHandler(request =>
+                       {
+                           if (++requests == 1)
+                           {
+                               AssertReleaseLookup(request);
+                               return Response(HttpStatusCode.NotFound, "{}");
+                           }
+
                            Assert.AreEqual(HttpMethod.Post, request.Method);
                            Assert.AreEqual("https://api.github.com/repos/mroshaw/BelowZeroThunderKitMods/releases",
                                request.RequestUri.AbsoluteUri);
@@ -41,7 +91,7 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
                 StringAssert.Contains("mroshaw/BelowZeroThunderKitMods", exception.Message);
                 StringAssert.Contains("VehicleEnhancements_SN-v1.0.0", exception.Message);
                 StringAssert.Contains("already_exists", exception.Message);
-                Assert.AreEqual(1, requests);
+                Assert.AreEqual(2, requests);
             }
         }
 
@@ -51,15 +101,17 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
             int requests = 0;
             using (GitHubReleasesApiClient client = new GitHubReleasesApiClient("test-token",
                        new TestHandler(request => ++requests == 1
-                           ? ReleaseResponse()
-                           : Response(HttpStatusCode.Forbidden, "Upload denied"))))
+                           ? Response(HttpStatusCode.NotFound, "{}")
+                           : requests == 2
+                               ? ReleaseResponse()
+                               : Response(HttpStatusCode.Forbidden, "Upload denied"))))
             {
                 HttpRequestException exception = await PublishExpectingFailure(client);
                 StringAssert.Contains(Path.GetFileName(archivePath), exception.Message);
                 StringAssert.Contains("mroshaw/BelowZeroThunderKitMods", exception.Message);
                 StringAssert.Contains("VehicleEnhancements_SN-v1.0.0", exception.Message);
                 StringAssert.Contains("Upload denied", exception.Message);
-                Assert.AreEqual(2, requests);
+                Assert.AreEqual(3, requests);
             }
         }
 
@@ -72,6 +124,15 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
                        {
                            if (++requests == 1)
                            {
+                               AssertReleaseLookup(request);
+                               return Response(HttpStatusCode.NotFound, "{}");
+                           }
+
+                           if (requests == 2)
+                           {
+                               Assert.AreEqual(HttpMethod.Post, request.Method);
+                               Assert.AreEqual("https://api.github.com/repos/mroshaw/BelowZeroThunderKitMods/releases",
+                                   request.RequestUri.AbsoluteUri);
                                return ReleaseResponse();
                            }
 
@@ -86,7 +147,7 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
                 Assert.AreEqual("123", result.ReleaseId);
                 Assert.AreEqual("https://github.com/mroshaw/BelowZeroThunderKitMods/releases/tag/VehicleEnhancements_SN-v1.0.0",
                     result.HtmlUrl);
-                Assert.AreEqual(2, requests);
+                Assert.AreEqual(3, requests);
             }
         }
 
@@ -110,7 +171,15 @@ namespace DaftAppleGames.Editor.ModPublisher.Tests
             return null;
         }
 
-        private static HttpResponseMessage ReleaseResponse() => Response(HttpStatusCode.Created,
+        private static void AssertReleaseLookup(HttpRequestMessage request)
+        {
+            Assert.AreEqual(HttpMethod.Get, request.Method);
+            Assert.AreEqual("https://api.github.com/repos/mroshaw/BelowZeroThunderKitMods/releases/tags/VehicleEnhancements_SN-v1.0.0",
+                request.RequestUri.AbsoluteUri);
+            Assert.IsNull(request.Content);
+        }
+
+        private static HttpResponseMessage ReleaseResponse() => Response(HttpStatusCode.OK,
             "{\"id\":123,\"upload_url\":\"https://uploads.github.com/repos/mroshaw/BelowZeroThunderKitMods/releases/123/assets{?name,label}\",\"html_url\":\"https://github.com/mroshaw/BelowZeroThunderKitMods/releases/tag/VehicleEnhancements_SN-v1.0.0\"}");
 
         private static HttpResponseMessage Response(HttpStatusCode status, string body) =>
