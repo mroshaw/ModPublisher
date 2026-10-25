@@ -70,12 +70,38 @@ namespace DaftAppleGames.Editor.ModPublisher
             JObject release = await GetReleaseByTagAsync(
                 ApiBaseUrl + endpoint + "/tags/" + Uri.EscapeDataString(tagName),
                 releaseDescription, cancellationToken);
+            bool existingRelease = release != null;
             if (release == null)
             {
                 progress.Report(new UploadProgress(0.1f, "Creating GitHub release..."));
                 release = await SendJsonAsync(
                     HttpMethod.Post, ApiBaseUrl + endpoint, body,
                     $"create the GitHub release in {releaseDescription}", cancellationToken);
+            }
+            else
+            {
+                progress.Report(new UploadProgress(0.1f, "Updating GitHub release..."));
+                body.Remove("generate_release_notes");
+                if (options.GenerateReleaseNotes)
+                {
+                    JObject notesRequest = new JObject { ["tag_name"] = tagName };
+                    if (body["target_commitish"] != null)
+                    {
+                        notesRequest["target_commitish"] = body["target_commitish"].DeepClone();
+                    }
+
+                    JObject notes = await SendJsonAsync(
+                        HttpMethod.Post, ApiBaseUrl + endpoint + "/generate-notes", notesRequest,
+                        $"generate release notes for {releaseDescription}", cancellationToken);
+                    string generatedNotes = (string)notes["body"] ?? string.Empty;
+                    body["body"] = string.IsNullOrEmpty(changelog)
+                        ? generatedNotes
+                        : changelog + "\n\n" + generatedNotes;
+                }
+
+                release = await SendJsonAsync(
+                    new HttpMethod("PATCH"), ApiBaseUrl + endpoint + "/" + Escape(RequireString(release, "id")), body,
+                    $"update the GitHub release in {releaseDescription}", cancellationToken);
             }
             string releaseId = RequireString(release, "id");
             string uploadUrl = RequireString(release, "upload_url");
@@ -87,13 +113,20 @@ namespace DaftAppleGames.Editor.ModPublisher
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            progress.Report(new UploadProgress(0.25f, "Uploading GitHub release asset..."));
             string assetName = Path.GetFileName(archivePath);
             string assetUrl = uploadUrl + "?name=" + Uri.EscapeDataString(assetName);
             using (FileStream stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read))
             using (StreamContent content = new StreamContent(stream))
             using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, assetUrl))
             {
+                if (existingRelease)
+                {
+                    progress.Report(new UploadProgress(0.25f, "Removing previous GitHub release assets..."));
+                    await DeleteReleaseAssetsAsync(
+                        ApiBaseUrl + endpoint, releaseId, releaseDescription, cancellationToken);
+                }
+
+                progress.Report(new UploadProgress(0.3f, "Uploading GitHub release asset..."));
                 content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
                 request.Content = content;
                 using (HttpResponseMessage response = await client.SendAsync(request, cancellationToken))
@@ -110,6 +143,46 @@ namespace DaftAppleGames.Editor.ModPublisher
         public void Dispose()
         {
             client.Dispose();
+        }
+
+        private async Task DeleteReleaseAssetsAsync(
+            string releasesUrl,
+            string releaseId,
+            string releaseDescription,
+            CancellationToken cancellationToken)
+        {
+            // Collect all assets before deleting so pagination cannot skip assets as the list shrinks.
+            JArray previousAssets = new JArray();
+            for (int page = 1; ; page++)
+            {
+                string url = releasesUrl + "/" + Escape(releaseId) + "/assets?per_page=100&page=" + page;
+                JArray assets;
+                using (HttpResponseMessage response = await client.GetAsync(url, cancellationToken))
+                {
+                    await EnsureSuccessAsync(response, $"list GitHub release assets in {releaseDescription}");
+                    assets = JArray.Parse(await response.Content.ReadAsStringAsync());
+                }
+
+                foreach (JObject asset in assets)
+                {
+                    previousAssets.Add(asset);
+                }
+
+                if (assets.Count < 100)
+                {
+                    break;
+                }
+            }
+
+            foreach (JObject asset in previousAssets)
+            {
+                string url = releasesUrl + "/assets/" + Escape(RequireString(asset, "id"));
+                using (HttpResponseMessage response = await client.DeleteAsync(url, cancellationToken))
+                {
+                    await EnsureSuccessAsync(response,
+                        $"delete previous GitHub release asset '{RequireString(asset, "name")}' in {releaseDescription}");
+                }
+            }
         }
 
         private async Task<JObject> GetReleaseByTagAsync(
