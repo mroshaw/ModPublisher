@@ -4,6 +4,7 @@
 
 ### Unreleased
 
+- Reference Newtonsoft.Json directly instead of the Plastic SCM copy in publishing clients and tests.
 - Replace an existing GitHub release's details and all assets for the requested tag with the current publishing values and ZIP, preserving the tag.
 - Moved the GitHub owner and repository into the project's ModVersionSettings asset to prevent publishing to another project's repository and allow version control. Configure the destination once per project after upgrading.
 - Included the repository and requested tag in GitHub publishing errors.
